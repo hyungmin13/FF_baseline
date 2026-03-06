@@ -146,6 +146,7 @@ class PINN(PINNbase):
         g_batches = itertools.cycle(data_g)
         gv_batches = itertools.cycle(data_gv)
         batch_g = next(g_batches)
+
         batch_gv = next(gv_batches)
 
         # Initializing the update function
@@ -217,6 +218,9 @@ class PINN(PINNbase):
             all_params["network"]["layers"] = dynamic_params
             e_key = next(e_batch_key)
             e_batch_pos = random.choice(e_key, valid_data['pos'], shape = (self.c.optimization_init_kwargs["e_batch"],))
+            e_batch_pos[:,1] = e_batch_pos[:,1]*all_params["domain"]["domain_range"]["x"][1]
+            e_batch_pos[:,2] = e_batch_pos[:,2]*all_params["domain"]["domain_range"]["y"][1]
+            e_batch_pos[:,3] = e_batch_pos[:,3]*all_params["domain"]["domain_range"]["z"][1]
             e_batch_vel = random.choice(e_key, valid_data['vel'], shape = (self.c.optimization_init_kwargs["e_batch"],))
             _, out_x = self.cal_grad(all_params, e_batch_pos, jnp.tile(jnp.array([[0.0, 1.0, 0.0, 0.0]]),(e_batch_pos.shape[0],1)), model_fns)
             _, out_y = self.cal_grad(all_params, e_batch_pos, jnp.tile(jnp.array([[0.0, 0.0, 1.0, 0.0]]),(e_batch_pos.shape[0],1)), model_fns)
