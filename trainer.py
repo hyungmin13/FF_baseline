@@ -119,6 +119,7 @@ class PINN(PINNbase):
         g_batch[:,1] = g_batch[:,1]*all_params["domain"]["domain_range"]["x"][1]
         g_batch[:,2] = g_batch[:,2]*all_params["domain"]["domain_range"]["y"][1]
         g_batch[:,3] = g_batch[:,3]*all_params["domain"]["domain_range"]["z"][1]
+        print(np.unique(g_batch[:,1]))
         _, g_count = np.unique(g_batch[:,0], return_counts=True)
         vfield_names = np.sort(glob(cur_dir + '/' + 'ff_coeff/lv' + str(downsample) + '/*.hdf5'))
         gv_batch = []
@@ -221,31 +222,22 @@ class PINN(PINNbase):
             scale = jnp.array([1.0, all_params["domain"]["domain_range"]["x"][1],
                                all_params["domain"]["domain_range"]["y"][1], all_params["domain"]["domain_range"]["z"][1]])
             e_batch_pos = e_batch_pos * scale
+            print(np.unique(e_batch_pos[:,1]), np.unique(e_batch_pos[:,2]), np.unique(e_batch_pos[:,3]))
             e_batch_vel = random.choice(e_key, valid_data['vel'], shape = (self.c.optimization_init_kwargs["e_batch"],))
-            _, out_x = self.cal_grad(all_params, e_batch_pos, jnp.tile(jnp.array([[0.0, 1.0, 0.0, 0.0]]),(e_batch_pos.shape[0],1)), model_fns)
-            _, out_y = self.cal_grad(all_params, e_batch_pos, jnp.tile(jnp.array([[0.0, 0.0, 1.0, 0.0]]),(e_batch_pos.shape[0],1)), model_fns)
-            _, out_z = self.cal_grad(all_params, e_batch_pos, jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(e_batch_pos.shape[0],1)), model_fns)
-            u_pred = out_y[:,2:3] - out_z[:,1:2]
-            v_pred = out_z[:,0:1] - out_x[:,2:3]
-            w_pred = out_x[:,1:2] - out_y[:,0:1]
+            error_loss = report_fn(dynamic_params, all_params, e_batch_pos, e_batch_vel, model_fns)
 
 
-            u_error = jnp.sqrt(jnp.mean((u_pred - e_batch_vel[:,0:1])**2)/jnp.mean(e_batch_vel[:,0:1]**2))
-            v_error = jnp.sqrt(jnp.mean((v_pred - e_batch_vel[:,1:2])**2)/jnp.mean(e_batch_vel[:,1:2]**2))
-            w_error = jnp.sqrt(jnp.mean((w_pred - e_batch_vel[:,2:3])**2)/jnp.mean(e_batch_vel[:,2:3]**2))
+            u_error = error_loss[-3]
+            v_error = error_loss[-2]
+            w_error = error_loss[-1]
             #if v_pred.shape[1] == 5:
             #    T_error = jnp.sqrt(jnp.mean((all_params["data"]["T_ref"]*v_pred[:,4] - e_batch_T)**2)/jnp.mean(e_batch_T**2))
 
             Losses = report_fn(dynamic_params, all_params, batch_g, batch_gv, model_fns)
-            if v_pred.shape[1] == 5:
-                print(f"step_num : {i:<{12}} u_loss : {Losses[1]:<{12}.{5}} v_loss : {Losses[2]:<{12}.{5}} w_loss : {Losses[3]:<{12}.{5}} u_error : {u_error:<{12}.{5}} v_error : {v_error:<{12}.{5}} w_error : {w_error:<{12}.{5}}")
-                with open(self.c.report_out_dir + "reports.txt", "a") as f:
-                    f.write(f"{i:<{12}} {Losses[0]:<{12}.{5}} {Losses[1]:<{12}.{5}} {Losses[2]:<{12}.{5}} {Losses[3]:<{12}.{5}} {v_error:<{12}.{5}} {w_error:<{12}.{5}}\n")
-            
-            else:
-                print(f"step_num : {i:<{12}} u_loss : {Losses[1]:<{12}.{5}} v_loss : {Losses[2]:<{12}.{5}} w_loss : {Losses[3]:<{12}.{5}} u_error : {u_error:<{12}.{5}} v_error : {v_error:<{12}.{5}} w_error : {w_error:<{12}.{5}}")
-                with open(self.c.report_out_dir + "reports.txt", "a") as f:
-                    f.write(f"{i:<{12}} {Losses[0]:<{12}.{5}} {Losses[1]:<{12}.{5}} {Losses[2]:<{12}.{5}} {Losses[3]:<{12}.{5}} {u_error:<{12}.{5}} {v_error:<{12}.{5}} {w_error:<{12}.{5}} {0.0:<{12}.{5}}\n")
+
+            print(f"step_num : {i:<{12}} u_loss : {Losses[1]:<{12}.{5}} v_loss : {Losses[2]:<{12}.{5}} w_loss : {Losses[3]:<{12}.{5}} u_error : {u_error:<{12}.{5}} v_error : {v_error:<{12}.{5}} w_error : {w_error:<{12}.{5}}")
+            with open(self.c.report_out_dir + "reports.txt", "a") as f:
+                f.write(f"{i:<{12}} {Losses[0]:<{12}.{5}} {Losses[1]:<{12}.{5}} {Losses[2]:<{12}.{5}} {Losses[3]:<{12}.{5}} {u_error:<{12}.{5}} {v_error:<{12}.{5}} {w_error:<{12}.{5}} {0.0:<{12}.{5}}\n")
             f.close()
 
         return
